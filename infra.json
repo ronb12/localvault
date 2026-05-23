@@ -1,0 +1,11 @@
+{
+  "app_name": "LocalVault",
+  "slug": "localvault",
+  "folder": "/Volumes/My Passport for Mac/LocalVault",
+  "github_repository": "https://github.com/ronb12/localvault",
+  "vercel_project": "localvault",
+  "vercel_url": "https://localvault-m6j6kobes-ronell-bradleys-projects.vercel.app\",",
+  "neon_project_id": "patient-fire-15819966",
+  "neon_database_name": "localvault",
+  "neon_console_url": "https://console.neon.tech/app/projects/patient-fire-15819966"
+}
