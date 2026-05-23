@@ -10,6 +10,19 @@ body {
     linear-gradient(180deg, #0d1410 0%, #040806 100%);
 }
 .shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 28px 0 54px; }
+.subnav { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+.subnav-tab {
+  width: auto;
+  border: 1px solid rgba(151, 220, 132, 0.16);
+  background: rgba(16, 26, 18, 0.84);
+  color: #a6caa3;
+  font-weight: 700;
+  cursor: pointer;
+}
+.subnav-tab.active {
+  color: #172216;
+  background: linear-gradient(135deg, #98e88d 0%, #ffd470 100%);
+}
 .hero, .panel, .metric, .hero-card, .loading-card {
   background: rgba(16, 26, 18, 0.84);
   border: 1px solid rgba(151, 220, 132, 0.16);
@@ -37,6 +50,18 @@ body {
 .metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 18px; }
 .metric strong { display: block; margin-top: 10px; font-size: 2rem; }
 .board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.split-layout,
+.spotlight-grid,
+.lead-board {
+  display: grid;
+  gap: 18px;
+}
+.split-layout { grid-template-columns: 1.1fr 1fr; }
+.spotlight-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.compact-cards { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.lead-board { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.stage-column h3 { margin: 0 0 10px; }
+.slim { padding: 14px; }
 .row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 input, select, textarea, button {
   width: 100%;
@@ -79,7 +104,7 @@ button {
   color: #afc3ac;
 }
 @media (max-width: 980px) {
-  .hero, .metrics, .board { grid-template-columns: 1fr; }
+  .hero, .metrics, .board, .split-layout, .spotlight-grid, .lead-board { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .shell { width: min(100% - 24px, 1180px); padding-top: 20px; }
