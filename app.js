@@ -1,105 +1,231 @@
 (() => {
-  const key = "localvault-v1";
-  const state = JSON.parse(localStorage.getItem(key) || "null") || {
-    listings: [
-      { id: crypto.randomUUID(), name: "Bright Plate Catering", category: "Food", booking: "brightplate.example", deal: "10% off first event", reviews: 18, featured: true },
-      { id: crypto.randomUUID(), name: "Glow Studio Spa", category: "Beauty", booking: "glowspa.example", deal: "Free add-on mask", reviews: 12, featured: false },
-    ],
-    filter: "All",
-  };
-  const save = () => localStorage.setItem(key, JSON.stringify(state));
+  const app = document.querySelector("#app");
+  const state = { listings: [], offers: [], leads: [], stats: {} };
 
-  document.head.insertAdjacentHTML("beforeend", `<style>
-    body{margin:0;background:#111514;color:#edf6f2;font:16px/1.45 system-ui,sans-serif}main{max-width:1150px;margin:0 auto;padding:28px 20px 48px}
-    .lv-grid,.cards,.list{display:grid;gap:16px}.hero,.card{background:#192120;border:1px solid #35514c;border-radius:20px;padding:20px}
-    .cards{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}.item{background:#111917;border-radius:14px;padding:14px;display:grid;gap:5px}.row{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
-    .actions{display:flex;gap:8px;flex-wrap:wrap}.meta{color:#a8c5bd}.tag{display:inline-block;padding:4px 9px;border-radius:999px;background:#25463f;font-size:12px}
-    form{display:grid;gap:10px}input,select,button{font:inherit;padding:11px 12px;border-radius:12px;border:1px solid #4c746b}input,select{background:#0d1312;color:#f4fffb}button{background:#8cf2d2;color:#0d1d18;font-weight:700;cursor:pointer}
-    @media (max-width:760px){.row{grid-template-columns:1fr}}
-  </style>`);
+  function formatDate(value) {
+    return new Date(`${value}T12:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  }
 
-  const main = document.querySelector("main");
+  async function post(url, payload) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: "Request failed" }));
+      throw new Error(error.error || "Request failed");
+    }
+    return response.json();
+  }
 
-  function filteredListings() {
-    return state.filter === "All" ? state.listings : state.listings.filter((listing) => listing.category === state.filter);
+  function renderCollection(items, mapper, emptyText) {
+    return items.length ? items.map(mapper).join("") : `<div class="empty">${emptyText}</div>`;
+  }
+
+  function bindForms() {
+    document.querySelector("#listingForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      await post("/api/listings", {
+        name: String(form.get("name")),
+        category: String(form.get("category")),
+        neighborhood: String(form.get("neighborhood")),
+        bookingUrl: String(form.get("bookingUrl")),
+        tier: String(form.get("tier")),
+        featured: String(form.get("featured")) === "yes",
+      });
+      event.currentTarget.reset();
+      await load();
+    });
+
+    document.querySelector("#offerForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      await post("/api/offers", {
+        listingId: String(form.get("listingId")),
+        title: String(form.get("title")),
+        details: String(form.get("details")),
+        status: String(form.get("status")),
+        expiresOn: String(form.get("expiresOn")),
+      });
+      event.currentTarget.reset();
+      await load();
+    });
+
+    document.querySelector("#leadForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const form = new FormData(event.currentTarget);
+      await post("/api/leads", {
+        listingId: String(form.get("listingId")),
+        customerName: String(form.get("customerName")),
+        requestType: String(form.get("requestType")),
+        contact: String(form.get("contact")),
+        status: String(form.get("status")),
+      });
+      event.currentTarget.reset();
+      await load();
+    });
   }
 
   function render() {
-    const listings = filteredListings();
-    main.innerHTML = `
-      <div class="lv-grid">
-        <section class="hero">
-          <h1>LocalVault</h1>
-          <p class="meta">Maintain business listings, promoted deals, and review counts with category filtering and saved local state.</p>
-          <div class="actions">
-            ${["All", "Food", "Beauty", "Home"].map((category) => `<button type="button" data-filter="${category}">${category}</button>`).join("")}
-          </div>
-        </section>
-        <section class="cards">
-          <article class="card">
-            <h2>Add Listing</h2>
-            <form id="listingForm">
-              <input name="name" placeholder="Business name" required>
-              <div class="row">
-                <select name="category"><option>Food</option><option>Beauty</option><option>Home</option></select>
-                <input name="booking" placeholder="Booking link or handle" required>
-              </div>
-              <input name="deal" placeholder="Featured deal" required>
-              <button type="submit">Save Listing</button>
-            </form>
-          </article>
-          <article class="card">
-            <h2>Directory</h2>
-            <div class="list">
-              ${listings.map((listing) => `<div class="item"><b>${listing.name}</b><span>${listing.category}</span><span class="meta">${listing.booking}</span><span class="tag">${listing.deal}</span><div class="actions"><span>${listing.reviews} reviews</span><button data-review="${listing.id}">Add Review</button><button data-feature="${listing.id}">${listing.featured ? "Unfeature" : "Feature"}</button></div></div>`).join("")}
+    app.innerHTML = `
+      <section class="metrics">
+        <article class="metric">
+          <span class="muted">Total listings</span>
+          <strong>${state.stats.totalListings || 0}</strong>
+          <span class="muted">Businesses in directory</span>
+        </article>
+        <article class="metric">
+          <span class="muted">Featured</span>
+          <strong>${state.stats.featuredListings || 0}</strong>
+          <span class="muted">Premium spots highlighted</span>
+        </article>
+        <article class="metric">
+          <span class="muted">Live offers</span>
+          <strong>${state.stats.liveOffers || 0}</strong>
+          <span class="muted">Promotions currently running</span>
+        </article>
+        <article class="metric">
+          <span class="muted">Open leads</span>
+          <strong>${state.stats.openLeads || 0}</strong>
+          <span class="muted">Customer inquiries still active</span>
+        </article>
+      </section>
+      <section class="board">
+        <article class="panel">
+          <h2>Listings</h2>
+          <p class="muted">Add businesses with category, neighborhood, booking link, and tier.</p>
+          <form id="listingForm">
+            <input name="name" placeholder="Business name" required>
+            <div class="row">
+              <input name="category" placeholder="Category" required>
+              <input name="neighborhood" placeholder="Neighborhood" required>
             </div>
-          </article>
-        </section>
-      </div>`;
+            <input name="bookingUrl" placeholder="Booking URL" required>
+            <div class="row">
+              <select name="tier">
+                <option>Standard</option>
+                <option>Premium</option>
+                <option>Spotlight</option>
+              </select>
+              <select name="featured">
+                <option value="no">Not featured</option>
+                <option value="yes">Featured</option>
+              </select>
+            </div>
+            <button type="submit">Add listing</button>
+          </form>
+          <div class="collection">
+            ${renderCollection(
+              state.listings,
+              (listing) => `
+                <div class="card">
+                  <strong>${listing.name}</strong>
+                  <span class="chip">${listing.category}</span>
+                  <p>${listing.neighborhood} • ${listing.tier}</p>
+                  <p>${listing.booking_url}</p>
+                  <span class="muted">${listing.reviews} reviews • ${listing.featured ? "Featured" : "Standard placement"}</span>
+                </div>
+              `,
+              "No businesses have been added yet."
+            )}
+          </div>
+        </article>
+        <article class="panel">
+          <h2>Offers</h2>
+          <p class="muted">Publish and track promotional campaigns tied to local listings.</p>
+          <form id="offerForm">
+            <select name="listingId">
+              ${state.listings.map((listing) => `<option value="${listing.id}">${listing.name}</option>`).join("")}
+            </select>
+            <input name="title" placeholder="Offer title" required>
+            <textarea name="details" placeholder="Offer details" required></textarea>
+            <div class="row">
+              <select name="status">
+                <option>Live</option>
+                <option>Draft</option>
+                <option>Expired</option>
+              </select>
+              <input name="expiresOn" type="date" required>
+            </div>
+            <button type="submit">Add offer</button>
+          </form>
+          <div class="collection">
+            ${renderCollection(
+              state.offers,
+              (offer) => `
+                <div class="card">
+                  <strong>${offer.title}</strong>
+                  <span class="chip">${offer.status}</span>
+                  <p>${offer.listing_name || "Listing removed"}</p>
+                  <p>${offer.details}</p>
+                  <span class="muted">Expires ${formatDate(offer.expires_on)}</span>
+                </div>
+              `,
+              "No offers are active yet."
+            )}
+          </div>
+        </article>
+        <article class="panel">
+          <h2>Lead Intake</h2>
+          <p class="muted">Capture inquiry source, request type, and response status for local leads.</p>
+          <form id="leadForm">
+            <select name="listingId">
+              ${state.listings.map((listing) => `<option value="${listing.id}">${listing.name}</option>`).join("")}
+            </select>
+            <input name="customerName" placeholder="Customer name" required>
+            <div class="row">
+              <input name="requestType" placeholder="Request type" required>
+              <input name="contact" placeholder="Contact email or phone" required>
+            </div>
+            <select name="status">
+              <option>New</option>
+              <option>Contacted</option>
+              <option>Qualified</option>
+              <option>Closed</option>
+            </select>
+            <button type="submit">Log lead</button>
+          </form>
+          <div class="collection">
+            ${renderCollection(
+              state.leads,
+              (lead) => `
+                <div class="card">
+                  <strong>${lead.customer_name}</strong>
+                  <span class="chip">${lead.status}</span>
+                  <p>${lead.listing_name || "Listing removed"} • ${lead.request_type}</p>
+                  <span class="muted">${lead.contact}</span>
+                </div>
+              `,
+              "No inbound leads have been logged yet."
+            )}
+          </div>
+        </article>
+      </section>
+    `;
 
-    document.querySelector("#listingForm").addEventListener("submit", (event) => {
-      event.preventDefault();
-      const form = new FormData(event.currentTarget);
-      state.listings.unshift({
-        id: crypto.randomUUID(),
-        name: String(form.get("name")),
-        category: String(form.get("category")),
-        booking: String(form.get("booking")),
-        deal: String(form.get("deal")),
-        reviews: 0,
-        featured: false,
-      });
-      save();
-      render();
-    });
-
-    document.querySelectorAll("[data-filter]").forEach((button) => {
-      button.addEventListener("click", () => {
-        state.filter = button.dataset.filter;
-        save();
-        render();
-      });
-    });
-
-    document.querySelectorAll("[data-review]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const listing = state.listings.find((entry) => entry.id === button.dataset.review);
-        listing.reviews += 1;
-        save();
-        render();
-      });
-    });
-
-    document.querySelectorAll("[data-feature]").forEach((button) => {
-      button.addEventListener("click", () => {
-        const listing = state.listings.find((entry) => entry.id === button.dataset.feature);
-        listing.featured = !listing.featured;
-        save();
-        render();
-      });
-    });
+    bindForms();
   }
 
-  save();
-  render();
+  async function load() {
+    app.innerHTML = '<div class="loading-card">Refreshing local marketplace...</div>';
+    const response = await fetch("/api/bootstrap");
+    if (!response.ok) {
+      throw new Error("Failed to load LocalVault");
+    }
+    const payload = await response.json();
+    state.listings = payload.listings;
+    state.offers = payload.offers;
+    state.leads = payload.leads;
+    state.stats = payload.stats;
+    render();
+  }
+
+  load().catch((error) => {
+    app.innerHTML = `<div class="loading-card">LocalVault could not load: ${error.message}</div>`;
+  });
 })();
